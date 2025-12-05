@@ -180,8 +180,7 @@ if st.button("Generate ID Card"):
             )
 
             # Display
-            display_width = min(final.width, 900)
-            st.image(final, caption="Generated ID Card", width=display_width)
+            st.image(final, caption="Generated Banner", width=550)
 
             # Download
             img_bytes = io.BytesIO()
