@@ -3,6 +3,7 @@ import os
 from PIL import Image, ImageDraw, ImageFont
 import streamlit as st
 
+
 # Configuration
 
 BANNER_PATH = "assets/template.png"
@@ -15,17 +16,15 @@ SLOT_Y = 85
 SLOT_W = 600
 SLOT_H = 800
 
-NAME_BOX_X1 = 278
-NAME_BOX_X2 = 800
-NAME_BOX_Y1 = 705
-NAME_BOX_Y2 = 790
-NAME_BOX_HEIGHT = NAME_BOX_Y2 - NAME_BOX_Y1
-NAME_FONT_PATH = "assets/Khand-SemiBold.ttf"
-MAX_NAME_FONT = 66
+# Text boxes (x1, x2, y1, y2)
+NAME_BOX = (285, 795, 705, 785)
+DESG_BOX = (357, 722, 807, 855)
 
-DESG_FONT = "assets/Poppins-SemiBold.ttf"
+NAME_FONT_PATH = "assets/Poppins-SemiBold.ttf"
+DESG_FONT_PATH = "assets/Poppins-Medium.ttf"
 
-# Image Functions
+
+# Image Processing Functions
 
 def resize_input_image(img):
     img.thumbnail((STANDARD_W, STANDARD_H), Image.LANCZOS)
@@ -34,7 +33,6 @@ def resize_input_image(img):
     y = (STANDARD_H - img.height) // 2
     background.paste(img, (x, y))
     return background
-
 
 def fit_image_to_slot(img, slot_w, slot_h):
     img_ratio = img.width / img.height
@@ -57,6 +55,8 @@ def fit_image_to_slot(img, slot_w, slot_h):
     return img.crop((left, top, right, bottom))
 
 
+# Text Processing Function
+
 def add_text_fit_centered(
     base_image,
     text,
@@ -66,120 +66,117 @@ def add_text_fit_centered(
     box_x2,
     box_y1,
     box_y2,
-    min_font_size=12,
+    min_font_size=10,
     text_color=(255, 255, 255)
 ):
-    """
-    Draw text horizontally & vertically centered inside the given box.
-    Shrinks font size automatically if the text exceeds the width.
-    """
-
     draw = ImageDraw.Draw(base_image)
+
     allowed_width = box_x2 - box_x1
     allowed_height = box_y2 - box_y1
 
-    # 1) Try largest font size
+    # Start with max font size
     font_size = max_font_size
     font = ImageFont.truetype(font_path, font_size)
+
+    # Get natural text bounding box
     bbox = draw.textbbox((0, 0), text, font=font)
     text_width = bbox[2] - bbox[0]
-
-    # 2) Shrink if wider than allowed area
-    if text_width > allowed_width:
-        scale = allowed_width / text_width
-        font_size = max(min_font_size, int(font_size * scale))
-
-        # Rebuild font with new size
-        font = ImageFont.truetype(font_path, font_size)
-        bbox = draw.textbbox((0, 0), text, font=font)
-
-    # 3) Now compute final bounding box
-    text_width  = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
 
-    # 4) Horizontal center of the image (since your box is centered)
-    image_w = base_image.width
-    x = (image_w - text_width) // 2
+    # If text exceeds width or height, scale down
+    if text_width > allowed_width or text_height > allowed_height:
+        width_scale = allowed_width / text_width
+        height_scale = allowed_height / text_height
+        scale = min(width_scale, height_scale)
 
-    # 5) Vertical center inside the box
-    box_center_y = (box_y1 + box_y2) // 2
-    y = box_center_y - (text_height // 2)
+        font_size = max(min_font_size, int(font_size * scale))
+        font = ImageFont.truetype(font_path, font_size)
 
-    # 6) Draw
+        # Recompute with final font size
+        bbox = draw.textbbox((0, 0), text, font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+
+    # Horizontal center inside the box
+    x = box_x1 + (allowed_width - text_width) // 2
+
+    # Vertical center inside the box
+    y = box_y1 + (allowed_height - text_height) // 2
+
     draw.text((x, y), text, font=font, fill=text_color)
+    return base_image
 
-    return base_image, font_size
 
 # Streamlit UI
 
-st.set_page_config(page_title="Banner Generator", layout="centered")
-st.title("Banner Generator")
-st.write("Upload a photo, enter the name & designation, and generate your banner.")
+st.set_page_config(page_title="GLF Banner Generator", layout="centered")
+st.title("GLF Banner Generator")
+st.write("Upload a photo and enter Name & Designation to generate a banner.")
 
 uploaded_file = st.file_uploader("Upload Photo", type=["jpg", "jpeg", "png"])
+name_text = st.text_input("Full Name")
+designation_text = st.text_input("Designation")
 
-name_text = st.text_input("Full Name", "")
-designation_text = st.text_input("Designation", "")
+if st.button("Generate Banner"):
 
-generate_btn = st.button("Generate Banner")
-
-if generate_btn:
     if uploaded_file is None:
         st.error("Please upload a photo.")
-    elif name_text.strip() == "" or designation_text.strip() == "":
-        st.error("Please enter name and designation.")
+    elif not name_text.strip():
+        st.error("Please enter a name.")
+    elif not designation_text.strip():
+        st.error("Please enter a designation.")
     else:
-        # Load banner
         if not os.path.exists(BANNER_PATH):
-            st.error(f"Banner template not found at '{BANNER_PATH}'.")
+            st.error(f"Banner template not found: {BANNER_PATH}")
         else:
+            # Load banner
             banner = Image.open(BANNER_PATH).convert("RGBA")
 
-            # Load uploaded image
+            # Load uploaded photo
             person_img = Image.open(uploaded_file).convert("RGBA")
 
-            # Process image
+            # Standardize & fit person image
             person_img = resize_input_image(person_img)
             fitted_img = fit_image_to_slot(person_img, SLOT_W, SLOT_H)
 
+            # Place in background
             background = Image.new("RGBA", banner.size, (0, 0, 0, 0))
             background.paste(fitted_img, (SLOT_X, SLOT_Y))
 
+            # Merge with banner
             final = Image.alpha_composite(background, banner)
 
-            # Add text (Name)
-            final, used_font = add_text_fit_centered(
+            # Add NAME (auto-fit)
+            final = add_text_fit_centered(
                 final,
                 text=name_text,
-                font_path="assets/Khand-SemiBold.ttf",
-                max_font_size=66,
-                box_x1=288,
-                box_x2=790,
-                box_y1=705,
-                box_y2=790,
-                min_font_size=12,
+                font_path=NAME_FONT_PATH,
+                max_font_size=56,
+                box_x1=NAME_BOX[0],
+                box_x2=NAME_BOX[1],
+                box_y1=NAME_BOX[2],
+                box_y2=NAME_BOX[3],
                 text_color=(255, 255, 255)
             )
 
-            # Add text (Designation)
-            final, used_font = add_text_fit_centered(
+            # Add DESIGNATION (auto-fit)
+            final = add_text_fit_centered(
                 final,
                 text=designation_text,
-                font_path="assets/Poppins-SemiBold.ttf",
-                max_font_size=32,
-                box_x1=367,
-                box_x2=712,
-                box_y1=807,
-                box_y2=855,
-                min_font_size=12,
+                font_path=DESG_FONT_PATH,
+                max_font_size=34,
+                box_x1=DESG_BOX[0],
+                box_x2=DESG_BOX[1],
+                box_y1=DESG_BOX[2],
+                box_y2=DESG_BOX[3],
                 text_color=(0, 0, 0)
             )
 
-            # Display output
+            # Display
             display_width = min(final.width, 900)
             st.image(final, caption="Generated Banner", width=display_width)
 
-            # Download button
+            # Download
             img_bytes = io.BytesIO()
             final.save(img_bytes, format="PNG")
             img_bytes.seek(0)
