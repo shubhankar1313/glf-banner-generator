@@ -1,7 +1,7 @@
 import io
 import os
 import re
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 import streamlit as st
 
 
@@ -95,8 +95,10 @@ def add_text_fit_centered(
         width_scale = allowed_width / text_width
         height_scale = allowed_height / text_height
         scale = min(width_scale, height_scale)
+        
         font_size = max(min_font_size, int(font_size * scale))
         font = ImageFont.truetype(font_path, font_size)
+        
         bbox = draw.textbbox((0, 0), text, font=font)
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
@@ -143,6 +145,11 @@ if st.button("Generate ID Card"):
             # Load uploaded photo
             person_img = Image.open(uploaded_file).convert("RGBA")
 
+            # Auto-correct orientation using EXIF
+            person_img = ImageOps.exif_transpose(person_img)
+
+            person_img = person_img.convert("RGBA")
+
             # Fit image exactly into the frame (cover fit)
             fitted_img = fit_image_to_frame(person_img, SLOT_W, SLOT_H)
 
@@ -153,7 +160,7 @@ if st.button("Generate ID Card"):
             # Merge with ID Card template
             final = Image.alpha_composite(background, id_card)
 
-            # Add NAME (auto-fit)
+            # Add Name
             final = add_text_fit_centered(
                 final,
                 text=name_text,
@@ -166,7 +173,7 @@ if st.button("Generate ID Card"):
                 text_color=(255, 255, 255)
             )
 
-            # Add DESIGNATION (auto-fit)
+            # Add Designation
             final = add_text_fit_centered(
                 final,
                 text=designation_text,
@@ -179,10 +186,10 @@ if st.button("Generate ID Card"):
                 text_color=(0, 0, 0)
             )
 
-            # Display
-            st.image(final, caption="Generated Banner", width=550)
+            # Display Preview
+            st.image(final, caption="Generated ID Card", width=550)
 
-            # Download
+            # Download Button
             img_bytes = io.BytesIO()
             final.save(img_bytes, format="PNG")
             img_bytes.seek(0)
