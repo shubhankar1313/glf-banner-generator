@@ -21,9 +21,12 @@ SLOT_H = 470
 NAME_BOX = (285, 795, 705, 785)
 DESG_BOX = (357, 722, 807, 855)
 
-NAME_FONT_PATH = "assets/Poppins-SemiBold.ttf"
-DESG_FONT_PATH = "assets/Poppins-Medium.ttf"
+# Hindi + English font paths
+NAME_FONT_EN = "assets/Poppins-SemiBold.ttf"
+NAME_FONT_HI = "assets/NotoSansDevanagari-SemiBold.ttf"
 
+DESG_FONT_EN = "assets/Poppins-Medium.ttf"
+DESG_FONT_HI = "assets/NotoSansDevanagari-Medium.ttf"
 
 # Utility functions
 
@@ -111,7 +114,7 @@ def add_text_fit_centered(
 
     # Language-Based Correction
     if is_english_text(text):
-        y -= 10  # Raise English text slightly
+        y -= 10   # English slightly raised
 
     draw.text((x, y), text, font=font, fill=text_color)
     return base_image
@@ -160,11 +163,15 @@ if st.button("Generate ID Card"):
             # Merge with ID Card template
             final = Image.alpha_composite(background, id_card)
 
+            # Select fonts based on language
+            name_font = NAME_FONT_EN if is_english_text(name_text) else NAME_FONT_HI
+            desg_font = DESG_FONT_EN if is_english_text(designation_text) else DESG_FONT_HI
+
             # Add Name
             final = add_text_fit_centered(
                 final,
                 text=name_text,
-                font_path=NAME_FONT_PATH,
+                font_path = name_font,
                 max_font_size=56,
                 box_x1=NAME_BOX[0],
                 box_x2=NAME_BOX[1],
@@ -177,7 +184,7 @@ if st.button("Generate ID Card"):
             final = add_text_fit_centered(
                 final,
                 text=designation_text,
-                font_path=DESG_FONT_PATH,
+                font_path = desg_font,
                 max_font_size=30,
                 box_x1=DESG_BOX[0],
                 box_x2=DESG_BOX[1],
